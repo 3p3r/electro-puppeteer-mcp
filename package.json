@@ -1,0 +1,39 @@
+{
+  "name": "electro-puppeteer-mcp",
+  "version": "1.0.0",
+  "description": "MCP and HTTP API to navigate and fetch through isolated puppeteer contexts locally",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron dist/index.js",
+    "test": "vitest --run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3p3r/electro-puppeteer-mcp.git"
+  },
+  "keywords": [],
+  "author": "Sepehr Laal",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/3p3r/electro-puppeteer-mcp/issues"
+  },
+  "homepage": "https://github.com/3p3r/electro-puppeteer-mcp#readme",
+  "devDependencies": {
+    "@types/express": "^5.0.4",
+    "@types/node": "^24.9.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8",
+    "axios": "^1.7.9",
+    "@modelcontextprotocol/sdk": "^1.20.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.2",
+    "electron": "^38.4.0",
+    "express": "^5.1.0",
+    "express-mcp-handler": "^0.3.0",
+    "puppeteer-core": "^24.26.1",
+    "puppeteer-in-electron": "^3.0.5",
+    "zod": "^3.25.76"
+  }
+}
