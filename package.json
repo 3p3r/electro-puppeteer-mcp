@@ -6,7 +6,13 @@
   "scripts": {
     "build": "tsc",
     "start": "npm run build && electron dist/index.js",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "biome:check": "biome check .",
+    "biome:fix": "biome check --write .",
+    "biome:format": "biome format --write ."
   },
   "repository": {
     "type": "git",
@@ -20,12 +26,13 @@
   },
   "homepage": "https://github.com/3p3r/electro-puppeteer-mcp#readme",
   "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "@modelcontextprotocol/sdk": "^1.20.2",
     "@types/express": "^5.0.4",
     "@types/node": "^24.9.1",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.8",
     "axios": "^1.7.9",
-    "@modelcontextprotocol/sdk": "^1.20.2"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.2",
