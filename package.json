@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "npm run build && electron dist/index.js",
+    "stop": "pkill -f 'electron dist/index.js' || true",
     "test": "vitest --run",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

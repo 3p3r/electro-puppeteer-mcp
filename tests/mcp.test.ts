@@ -1,9 +1,23 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import axios from 'axios'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 
+const execAsync = promisify(exec)
 const MCP_ENDPOINT = 'http://localhost:3000/mcp'
 
-describe('MCP Routes', () => {
+describe('MCP Routes', { sequential: true }, () => {
+  beforeAll(async () => {
+    // Start the server
+    execAsync('npm start')
+    // Wait a bit for the server to fully start
+    await new Promise(resolve => setTimeout(resolve, 2000))
+  }, 30000) // 30 second timeout for server startup
+
+  afterAll(async () => {
+    // Stop the server
+    await execAsync('npm stop').catch(() => { /* ignore errors on shutdown */ })
+  }, 10000) // 10 second timeout for server shutdown
   it('should list available tools', async () => {
     const response = await axios.post(MCP_ENDPOINT, {
       jsonrpc: '2.0',
