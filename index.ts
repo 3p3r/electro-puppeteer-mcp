@@ -6,6 +6,9 @@ import { statelessHandler } from 'express-mcp-handler'
 import * as puppeteer from 'puppeteer-core'
 import pie from 'puppeteer-in-electron'
 import { z } from 'zod'
+import chalk from 'chalk'
+import path from 'node:path'
+import fs from 'node:fs/promises'
 
 const expressApp = express()
 expressApp.use(express.json())
@@ -379,6 +382,14 @@ const main = async (): Promise<void> => {
   // Initialize PIE before app is ready
   await pie.initialize(app)
 
+  try {
+    const userDataDir = path.join(process.cwd(), '.data')
+    await fs.mkdir(userDataDir, { recursive: true })
+    app.setPath('userData', userDataDir)
+  } catch (error) {
+    console.error(chalk.red(`Failed to set userData path: ${error}`))
+  }
+
   // Wait for Electron app to be ready
   await app.whenReady()
 
@@ -389,9 +400,9 @@ const main = async (): Promise<void> => {
 
   // Start Express server
   expressApp.listen(port, () => {
-    console.log(`Express server running on port ${port}`)
-    console.log(`HTTP API available at: http://localhost:${port}`)
-    console.log(`MCP endpoint available at: http://localhost:${port}/mcp`)
+    console.log(chalk.cyan(`Express server running on port ${port}`))
+    console.log(chalk.cyan(`HTTP API available at: http://localhost:${port}`))
+    console.log(chalk.cyan(`MCP endpoint available at: http://localhost:${port}/mcp`))
   })
 }
 
