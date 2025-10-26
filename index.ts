@@ -114,6 +114,28 @@ const browserOperations = {
       return { success: false, message: `Failed to fetch: ${error}` }
     }
   },
+
+  async screenshot(
+    id: string
+  ): Promise<{ success: boolean; message: string; data?: Buffer; mimeType?: string }> {
+    try {
+      const session = resolveSession(id)
+      if (!session) {
+        return { success: false, message: 'Session not found' }
+      }
+
+      const buffer = await session.page.screenshot({ type: 'png' })
+
+      return {
+        success: true,
+        message: 'Screenshot captured successfully',
+        data: Buffer.from(buffer),
+        mimeType: 'image/png',
+      }
+    } catch (error) {
+      return { success: false, message: `Failed to capture screenshot: ${error}` }
+    }
+  },
 }
 
 // HTTP route handlers that use shared logic
@@ -183,6 +205,23 @@ const routeHandlers = {
 
     res.json(status)
   },
+
+  screenshot: async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params
+    const session = resolveSession(id)
+    if (!session) {
+      res.status(404).json({ success: false, message: 'Session not found' })
+      return
+    }
+    const result = await browserOperations.screenshot(id)
+    if (result.success && result.data && result.mimeType) {
+      res.setHeader('Content-Type', result.mimeType)
+      res.setHeader('Content-Length', result.data.length)
+      res.send(result.data)
+    } else {
+      res.status(500).json({ success: false, message: result.message })
+    }
+  },
 }
 
 // Express routes
@@ -190,6 +229,7 @@ expressApp.post('/sessions', routeHandlers.createSession)
 expressApp.delete('/sessions/:id', routeHandlers.deleteSession)
 expressApp.post('/sessions/:id/navigate', routeHandlers.navigateSession)
 expressApp.get('/sessions/:id/fetch', routeHandlers.fetchSession)
+expressApp.get('/sessions/:id/screenshot', routeHandlers.screenshot)
 expressApp.get('/status', routeHandlers.status)
 
 // MCP Server setup
@@ -284,6 +324,43 @@ const createMcpServer = () => {
     },
     async () => {
       const result = { success: false, message: 'Not implemented' }
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result) }],
+        structuredContent: result,
+      }
+    }
+  )
+
+  server.registerTool(
+    'take_screenshot',
+    {
+      title: 'Take Screenshot',
+      description: 'Capture a screenshot of the current page as PNG',
+      inputSchema: {
+        id: z.string().describe('The session ID'),
+      },
+      outputSchema: {
+        success: z.boolean(),
+        message: z.string(),
+        mimeType: z.string().optional(),
+        dataBase64: z.string().optional(),
+      },
+    },
+    async ({ id }) => {
+      const result = await browserOperations.screenshot(id)
+      if (result.success && result.data) {
+        const dataBase64 = result.data.toString('base64')
+        const structuredResult = {
+          success: result.success,
+          message: result.message,
+          mimeType: result.mimeType,
+          dataBase64,
+        }
+        return {
+          content: [{ type: 'text', text: dataBase64 }],
+          structuredContent: structuredResult,
+        }
+      }
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
         structuredContent: result,

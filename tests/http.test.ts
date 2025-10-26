@@ -87,4 +87,47 @@ describe('HTTP Routes', { sequential: true }, () => {
       expect(response.data).toHaveProperty('success', true)
     })
   })
+
+  describe('Screenshot Endpoint', () => {
+    let sessionId: string
+
+    it('should create a session for screenshot test', async () => {
+      const response = await axios.post(`${BASE_URL}/sessions`, {
+        initialUrl: 'https://example.com'
+      })
+
+      expect(response.status).toBe(201)
+      expect(response.data).toHaveProperty('id')
+      sessionId = response.data.id
+    })
+
+    it('should capture a screenshot as PNG', async () => {
+      const response = await axios.get(`${BASE_URL}/sessions/${sessionId}/screenshot`, {
+        responseType: 'arraybuffer'
+      })
+
+      expect(response.status).toBe(200)
+      expect(response.headers['content-type']).toBe('image/png')
+      expect(response.data).toBeInstanceOf(Buffer)
+      expect(response.data.length).toBeGreaterThan(0)
+    })
+
+    it('should return 404 for non-existent session screenshot', async () => {
+      try {
+        await axios.get(`${BASE_URL}/sessions/non-existent-id/screenshot`, {
+          responseType: 'json'
+        })
+      } catch (error: any) {
+        expect(error.response.status).toBe(404)
+        expect(error.response.data).toHaveProperty('success', false)
+        expect(error.response.data).toHaveProperty('message', 'Session not found')
+      }
+    })
+
+    it('should clean up screenshot test session', async () => {
+      const response = await axios.delete(`${BASE_URL}/sessions/${sessionId}`)
+      expect(response.status).toBe(200)
+      expect(response.data).toHaveProperty('success', true)
+    })
+  })
 })

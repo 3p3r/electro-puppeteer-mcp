@@ -59,6 +59,7 @@ describe('MCP Routes', { sequential: true }, () => {
     expect(toolNames).toContain('open_browser')
     expect(toolNames).toContain('close_browser')
     expect(toolNames).toContain('navigate_to_url')
+    expect(toolNames).toContain('take_screenshot')
   })
 
   it('should open browser with initialUrl', async () => {
@@ -151,10 +152,64 @@ describe('MCP Routes', { sequential: true }, () => {
     expect(result).toHaveProperty('currentUrl')
   })
 
-  it('should close browser with session ID', async () => {
+  it('should take screenshot with session ID', async () => {
     const response = await axios.post(MCP_ENDPOINT, {
       jsonrpc: '2.0',
       id: 4,
+      method: 'tools/call',
+      params: {
+        name: 'take_screenshot',
+        arguments: {
+          id: sessionId
+        }
+      }
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream'
+      },
+      responseType: 'stream'
+    })
+
+    const stream = response.data
+    let data = ''
+
+    for await (const chunk of stream) {
+      data += chunk.toString()
+    }
+
+    const lines = data.split('\n')
+    const dataLine = lines.find((line: string) => line.startsWith('data: '))
+    expect(dataLine).toBeDefined()
+
+    const jsonData = dataLine!.replace('data: ', '')
+    const parsed = JSON.parse(jsonData)
+
+    expect(parsed).toHaveProperty('result')
+    expect(parsed.result).toHaveProperty('content')
+    expect(Array.isArray(parsed.result.content)).toBe(true)
+    expect(parsed.result.content[0]).toHaveProperty('type', 'text')
+
+    // The content is base64 encoded screenshot data
+    const base64Data = parsed.result.content[0].text
+    expect(typeof base64Data).toBe('string')
+    expect(base64Data.length).toBeGreaterThan(0)
+
+    // Verify it's valid base64 and can be decoded to a buffer
+    const buffer = Buffer.from(base64Data, 'base64')
+    expect(buffer.length).toBeGreaterThan(0)
+
+    // Check structured content
+    expect(parsed.result).toHaveProperty('structuredContent')
+    expect(parsed.result.structuredContent).toHaveProperty('success', true)
+    expect(parsed.result.structuredContent).toHaveProperty('mimeType', 'image/png')
+    expect(parsed.result.structuredContent).toHaveProperty('dataBase64')
+  })
+
+  it('should close browser with session ID', async () => {
+    const response = await axios.post(MCP_ENDPOINT, {
+      jsonrpc: '2.0',
+      id: 5,
       method: 'tools/call',
       params: {
         name: 'close_browser',

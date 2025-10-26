@@ -131,6 +131,31 @@ curl -X DELETE http://localhost:3000/sessions/{SESSION_ID}
 
 ---
 
+#### Capture Screenshot
+Captures a PNG screenshot of the current page in a session.
+
+**Endpoint:** `GET /sessions/:id/screenshot`
+
+**Response:** `200 OK`
+- Content-Type: `image/png`
+- Body: Binary PNG image data
+
+**Error Response:** `404 Not Found`
+```json
+{
+  "success": false,
+  "message": "Session not found"
+}
+```
+
+**Example:**
+```bash
+curl -X GET http://localhost:3000/sessions/{SESSION_ID}/screenshot \
+  --output screenshot.png
+```
+
+---
+
 #### Fetch Page Content
 **Status:** Not Implemented
 
@@ -293,6 +318,45 @@ Navigates a browser session to a specific URL.
 
 ---
 
+##### take_screenshot
+Captures a PNG screenshot of the current page in a session.
+
+**Input Schema:**
+```typescript
+{
+  id: string  // Session ID
+}
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "message": "Screenshot captured successfully",
+  "mimeType": "image/png",
+  "dataBase64": "iVBORw0KGgoAAAANSUhEUgAA..."
+}
+```
+
+**Example Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "take_screenshot",
+    "arguments": {
+      "id": "550e8400-e29b-41d4-a716-446655440000"
+    }
+  }
+}
+```
+
+The response includes the screenshot as a base64-encoded PNG string in both the `content` array (as text) and in the `structuredContent` object with additional metadata.
+
+---
+
 ##### fetch_page_content
 **Status:** Not Implemented
 
@@ -341,6 +405,7 @@ Core functionality shared between HTTP and MCP interfaces:
 - `open(initialUrl?)` - Create new session
 - `close(id)` - Remove session
 - `navigate(id, url)` - Load URL in session
+- `screenshot(id)` - Capture PNG screenshot
 - `fetch(id)` - (Not implemented) Extract page content
 
 #### Server Architecture
@@ -424,13 +489,17 @@ curl -X POST http://localhost:3000/sessions/$SESSION_ID/navigate \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/?q=search"}'
 
-# 4. Check server status
+# 4. Capture a screenshot
+curl -X GET http://localhost:3000/sessions/$SESSION_ID/screenshot \
+  --output screenshot.png
+
+# 5. Check server status
 curl http://localhost:3000/status | jq
 
-# 5. Close the session
+# 6. Close the session
 curl -X DELETE http://localhost:3000/sessions/$SESSION_ID
 
-# 6. Verify session is closed
+# 7. Verify session is closed
 curl http://localhost:3000/status | jq '.sessions.active'
 ```
 
