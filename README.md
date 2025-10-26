@@ -156,18 +156,39 @@ curl -X GET http://localhost:3000/sessions/{SESSION_ID}/screenshot \
 
 ---
 
-#### Fetch Page Content
-**Status:** Not Implemented
+#### Fetch (Renderer Network Request)
+Performs a network request from the renderer process and returns a Response-like payload.
 
-**Endpoint:** `GET /sessions/:id/fetch`
+**Endpoint:** `POST /sessions/:id/fetch`
 
-**Response:** `501 Not Implemented`
+**Request Body:**
 ```json
 {
-  "success": false,
-  "message": "Not implemented"
+  "url": "https://example.com/api",
+  "method": "POST",
+  "headers": {"content-type": "application/json"},
+  "body": "eyJmb28iOiJiYXIifQ==",
+  "bodyEncoding": "base64"
 }
 ```
+
+Any standard Request fields may be provided: `method`, `headers`, `body` (as UTF-8 string or base64 with `bodyEncoding`), `redirect`, `credentials`, `cache`, `mode`, `referrer`, `referrerPolicy`, `integrity`, `keepalive`.
+
+**Response:** `200 OK`
+```json
+{
+  "ok": true,
+  "status": 200,
+  "statusText": "OK",
+  "url": "https://example.com/api",
+  "redirected": false,
+  "type": "basic",
+  "headers": {"content-type": "application/json"},
+  "bodyBase64": "eyJmb28iOiJiYXIifQ=="
+}
+```
+
+Decode `bodyBase64` to get the raw bytes of the response body.
 
 ---
 

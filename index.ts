@@ -39,6 +39,32 @@ const ensurePieConnected = async (): Promise<void> => {
 }
 
 // Shared business logic functions
+type SerializedFetchRequest = {
+  url: string
+  method?: string
+  headers?: Record<string, string>
+  body?: string
+  bodyEncoding?: 'base64' | 'utf8'
+  redirect?: string
+  credentials?: string
+  cache?: string
+  mode?: string
+  referrer?: string
+  referrerPolicy?: string
+  integrity?: string
+  keepalive?: boolean
+}
+
+type SerializedFetchResponse = {
+  ok: boolean
+  status: number
+  statusText: string
+  url: string
+  redirected: boolean
+  type: string
+  headers: Record<string, string>
+  bodyBase64: string
+}
 const browserOperations = {
   async open(initialUrl?: string): Promise<{ success: boolean; message: string; id?: string }> {
     try {
@@ -102,21 +128,108 @@ const browserOperations = {
     }
   },
 
-  async fetch(
-    id: string
-  ): Promise<{ success: boolean; message: string; content?: string; title?: string }> {
-    try {
-      const session = resolveSession(id)
-      if (!session) {
-        return { success: false, message: 'Session not found' }
+  async fetchRequest(
+    id: string,
+    request: SerializedFetchRequest
+  ): Promise<SerializedFetchResponse> {
+    const session = resolveSession(id)
+    if (!session) {
+      return {
+        ok: false,
+        status: 404,
+        statusText: 'Session not found',
+        url: '',
+        redirected: false,
+        type: 'basic',
+        headers: {},
+        bodyBase64: ''
       }
+    }
 
-      const content = await session.page.evaluate(() => document.body.innerText)
-      const title = await session.page.evaluate(() => document.title)
+    if (!request || !request.url) {
+      return {
+        ok: false,
+        status: 400,
+        statusText: 'Request url is required',
+        url: '',
+        redirected: false,
+        type: 'basic',
+        headers: {},
+        bodyBase64: ''
+      }
+    }
 
-      return { success: true, message: 'Content fetched successfully', content, title }
+    try {
+      const result = await session.page.evaluate(async (serialized: any) => {
+        const w: any = window as any
+        const headers = serialized.headers ? new w.Headers(serialized.headers) : undefined
+
+        let body: any = undefined
+        if (serialized.body !== undefined) {
+          if (serialized.bodyEncoding === 'base64') {
+            const binary = w.atob(serialized.body)
+            const bytes = new Uint8Array(binary.length)
+            for (let i = 0; i < binary.length; i++) {
+              bytes[i] = binary.charCodeAt(i)
+            }
+            body = bytes
+          } else {
+            body = serialized.body
+          }
+        }
+
+        const init: any = {
+          method: serialized.method || 'GET',
+          headers,
+          body,
+          redirect: serialized.redirect,
+          credentials: serialized.credentials,
+          cache: serialized.cache,
+          mode: serialized.mode,
+          referrer: serialized.referrer,
+          referrerPolicy: serialized.referrerPolicy,
+          integrity: serialized.integrity,
+          keepalive: serialized.keepalive,
+        }
+
+        const response = await w.fetch(serialized.url, init)
+        const headersObj: Record<string, string> = {}
+        response.headers.forEach((value: string, key: string) => {
+          headersObj[key] = value
+        })
+
+        const arrayBuf = await response.arrayBuffer()
+        const uint8 = new Uint8Array(arrayBuf)
+        let binaryStr = ''
+        for (let i = 0; i < uint8.length; i++) {
+          binaryStr += String.fromCharCode(uint8[i])
+        }
+        const bodyBase64 = w.btoa(binaryStr)
+
+        return {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          redirected: response.redirected,
+          type: response.type,
+          headers: headersObj,
+          bodyBase64,
+        }
+      }, request)
+
+      return result as SerializedFetchResponse
     } catch (error) {
-      return { success: false, message: `Failed to fetch: ${error}` }
+      return {
+        ok: false,
+        status: 500,
+        statusText: `Renderer fetch failed: ${String(error)}`,
+        url: '',
+        redirected: false,
+        type: 'basic',
+        headers: {},
+        bodyBase64: ''
+      }
     }
   },
 
@@ -182,8 +295,66 @@ const routeHandlers = {
     res.status(200).json(result)
   },
 
-  fetchSession: async (_req: Request, res: Response): Promise<void> => {
-    res.status(501).json({ success: false, message: 'Not implemented' })
+  fetchSession: async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params
+
+    const session = resolveSession(id)
+    if (!session) {
+      res.status(404).json({ success: false, message: 'Session not found' })
+      return
+    }
+
+    // Accept a "standard Request"-like JSON in body
+    const {
+      url,
+      method,
+      headers,
+      body,
+      bodyEncoding,
+      redirect,
+      credentials,
+      cache,
+      mode,
+      referrer,
+      referrerPolicy,
+      integrity,
+      keepalive,
+    } = req.body || {}
+
+    if (!url || typeof url !== 'string') {
+      res.status(400).json({ success: false, message: 'Request body must include url' })
+      return
+    }
+
+    const serializedReq = {
+      url,
+      method,
+      headers,
+      body,
+      bodyEncoding,
+      redirect,
+      credentials,
+      cache,
+      mode,
+      referrer,
+      referrerPolicy,
+      integrity,
+      keepalive,
+    }
+
+    const rendererResp = await browserOperations.fetchRequest(id, serializedReq)
+
+    // Translate back to a standard Response-like JSON payload
+    res.status(200).json({
+      ok: rendererResp.ok,
+      status: rendererResp.status,
+      statusText: rendererResp.statusText,
+      url: rendererResp.url,
+      redirected: rendererResp.redirected,
+      type: rendererResp.type,
+      headers: rendererResp.headers,
+      bodyBase64: rendererResp.bodyBase64,
+    })
   },
 
   status: async (_req: Request, res: Response): Promise<void> => {
@@ -280,10 +451,25 @@ const routeHandlers = {
 expressApp.post('/sessions', routeHandlers.createSession)
 expressApp.delete('/sessions/:id', routeHandlers.deleteSession)
 expressApp.post('/sessions/:id/navigate', routeHandlers.navigateSession)
-expressApp.get('/sessions/:id/fetch', routeHandlers.fetchSession)
+expressApp.post('/sessions/:id/fetch', routeHandlers.fetchSession)
 expressApp.get('/sessions/:id/screenshot', routeHandlers.screenshot)
 expressApp.get('/status', routeHandlers.status)
 expressApp.post('/quit', routeHandlers.quit)
+
+// Simple CORS-enabled echo endpoint for testing renderer fetch
+expressApp.options('/echo', (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', '*')
+  res.status(204).end()
+})
+
+expressApp.post('/echo', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', '*')
+  res.json({ headers: req.headers, body: req.body })
+})
 
 // MCP Server setup
 const createMcpServer = () => {
