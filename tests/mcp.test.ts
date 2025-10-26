@@ -17,8 +17,14 @@ describe('MCP Routes', { sequential: true }, () => {
   }, 30000) // 30 second timeout for server startup
 
   afterAll(async () => {
-    // Stop the server
-    await execAsync('npm stop').catch(() => { /* ignore errors on shutdown */ })
+    // Stop the server using the quit route
+    try {
+      await axios.post('http://localhost:3000/quit')
+      // Give the server time to shut down gracefully
+      await new Promise(resolve => setTimeout(resolve, 300))
+    } catch (error) {
+      // Ignore errors on shutdown (e.g., connection refused after quit)
+    }
   }, 10000) // 10 second timeout for server shutdown
   
   it('should list available tools', async () => {

@@ -9,6 +9,7 @@ import { z } from 'zod'
 import chalk from 'chalk'
 import path from 'node:path'
 import fs from 'node:fs/promises'
+import type { Server } from 'node:http'
 
 const expressApp = express()
 expressApp.use(express.json())
@@ -22,6 +23,7 @@ interface Session {
 
 const sessions = new Map<string, Session>()
 let globalBrowser: puppeteer.Browser | null = null
+let httpServer: Server | null = null
 
 // Helper functions
 const generateId = (): string => randomUUID()
@@ -225,6 +227,53 @@ const routeHandlers = {
       res.status(500).json({ success: false, message: result.message })
     }
   },
+
+  quit: async (_req: Request, res: Response): Promise<void> => {
+    // Send response immediately before shutdown
+    res.status(200).json({ success: true, message: 'Shutting down daemon' })
+
+    // Schedule graceful shutdown
+    setImmediate(async () => {
+      try {
+        // Close all browser windows
+        const allWindows = BrowserWindow.getAllWindows()
+        for (const window of allWindows) {
+          if (!window.isDestroyed()) {
+            window.close()
+          }
+        }
+
+        // Clear sessions
+        sessions.clear()
+
+        // Close global browser if present
+        if (globalBrowser) {
+          try {
+            await globalBrowser.close()
+          } catch (error) {
+            // Ignore errors on browser close
+          }
+          globalBrowser = null
+        }
+
+        // Close HTTP server
+        if (httpServer) {
+          httpServer.close(() => {
+            // After HTTP server closes, quit the Electron app
+            app.quit()
+            // Fallback to ensure status code 0
+            setTimeout(() => process.exit(0), 100)
+          })
+        } else {
+          app.quit()
+          setTimeout(() => process.exit(0), 100)
+        }
+      } catch (error) {
+        console.error(chalk.red(`Error during shutdown: ${error}`))
+        process.exit(0)
+      }
+    })
+  },
 }
 
 // Express routes
@@ -234,6 +283,7 @@ expressApp.post('/sessions/:id/navigate', routeHandlers.navigateSession)
 expressApp.get('/sessions/:id/fetch', routeHandlers.fetchSession)
 expressApp.get('/sessions/:id/screenshot', routeHandlers.screenshot)
 expressApp.get('/status', routeHandlers.status)
+expressApp.post('/quit', routeHandlers.quit)
 
 // MCP Server setup
 const createMcpServer = () => {
@@ -399,7 +449,7 @@ const main = async (): Promise<void> => {
   })
 
   // Start Express server
-  expressApp.listen(port, () => {
+  httpServer = expressApp.listen(port, () => {
     console.log(chalk.cyan(`Express server running on port ${port}`))
     console.log(chalk.cyan(`HTTP API available at: http://localhost:${port}`))
     console.log(chalk.cyan(`MCP endpoint available at: http://localhost:${port}/mcp`))

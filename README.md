@@ -203,6 +203,28 @@ curl http://localhost:3000/status
 
 ---
 
+#### Quit Daemon
+Gracefully shuts down the daemon by closing all browser windows, stopping the HTTP server, and exiting the Electron app with status code 0.
+
+**Endpoint:** `POST /quit`
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Shutting down daemon"
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:3000/quit
+```
+
+**Note:** This endpoint is useful for programmatic shutdown, especially in test environments. The daemon will close all active sessions, stop the HTTP server, and exit cleanly.
+
+---
+
 ### MCP Protocol
 
 The MCP endpoint is available at `http://localhost:3000/mcp` and follows the JSON-RPC 2.0 specification with Server-Sent Events (SSE) responses.

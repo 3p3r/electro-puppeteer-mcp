@@ -12,3 +12,4 @@
 - `npm run lint` to check for linting errors using Biome.
 - NEVER introduce split conditional logic in application code to fix tests
 - NEVER skip tests to fix them, fix the actual test instead or write better ones
+- Use `bash` to execute commands if it's available.
